@@ -20,7 +20,7 @@ class Streem():
             self._callables[stream_name] = func
 
             @wraps(func)
-            async def _call(self, *args, **kwargs):
+            async def _call(*args, **kwargs):
                 await self._create_redis()
 
                 arguments = pickle.dumps(args)
@@ -30,7 +30,7 @@ class Streem():
                     "kwarguments": kwarguments
                 }
 
-                return await self.redis._redis.xadd(self._stream_name, data)
+                return await self._redis.xadd(stream_name, data)
             return _call
         return _decorator
 
