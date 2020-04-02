@@ -3,8 +3,6 @@ import pickle
 from typing import Callable, Dict, List, Tuple
 from functools import wraps
 
-from redis.setup import create_redis
-
 from aioredis.errors import BusyGroupError
 import aioredis
 
@@ -14,8 +12,8 @@ class Streem():
         self._redis = None
         self._callables: Dict[str, Callable] = {}
 
-    def task(self, stream_name: str):
-        def _decorator(func):
+    def task(self, stream_name: str) -> Callable:
+        def _decorator(func: Callable) -> Callable:
             if stream_name in self._callables:
                 raise Exception(f"Stream: {stream_name} already registered")
 
