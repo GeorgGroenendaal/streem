@@ -8,31 +8,32 @@ import aioredis
 
 
 class Streem():
-    def __init__(self):
+    def __init__(self, prefix="streem"):
+        self._prefix = f"{prefix}_" if prefix else ""
         self._redis = None
         self._callables: Dict[str, Callable] = {}
 
-    def task(self, stream_name: str) -> Callable:
-        def _decorator(func: Callable) -> Callable:
-            if stream_name in self._callables:
-                raise Exception(f"Stream: {stream_name} already registered")
+    def task(self, func: Callable) -> Callable:
+        stream_name = f"{self._prefix}{func.__name__}"
 
-            self._callables[stream_name] = func
+        if stream_name in self._callables:
+            raise Exception(f"Stream: {stream_name} already registered")
 
-            @wraps(func)
-            async def _call(*args, **kwargs):
-                await self._create_redis()
+        self._callables[stream_name] = func
 
-                arguments = pickle.dumps(args)
-                kwarguments = pickle.dumps(kwargs)
-                data = {
-                    "arguments": arguments,
-                    "kwarguments": kwarguments
-                }
+        @wraps(func)
+        async def _call(*args, **kwargs):
+            await self._create_redis()
 
-                return await self._redis.xadd(stream_name, data)
-            return _call
-        return _decorator
+            arguments = pickle.dumps(args)
+            kwarguments = pickle.dumps(kwargs)
+            data = {
+                "arguments": arguments,
+                "kwarguments": kwarguments
+            }
+
+            return await self._redis.xadd(stream_name, data)
+        return _call
 
     async def start(self, consumer_name: str, group_name: str = "workers"):
         await self._create_redis()
