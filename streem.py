@@ -1,33 +1,12 @@
 import asyncio
 import pickle
 from typing import Callable, Dict, List, Tuple
+from functools import wraps
 
 from redis.setup import create_redis
 
 from aioredis.errors import BusyGroupError
 import aioredis
-
-
-class StreemTask():
-    def __init__(self, streem_instance, stream_name, func):
-        self._streem_instance = streem_instance
-        self._stream_name = stream_name
-        self._func = func
-
-    def __call__(self, *args, **kwargs):
-        return self._func(*args, **kwargs)
-
-    async def send(self, *args, **kwargs):
-        await self._streem_instance._create_redis()
-
-        arguments = pickle.dumps(args)
-        kwarguments = pickle.dumps(kwargs)
-        data = {
-            "arguments": arguments,
-            "kwarguments": kwarguments
-        }
-
-        return await self._streem_instance._redis.xadd(self._stream_name, data)
 
 
 class Streem():
@@ -41,9 +20,20 @@ class Streem():
                 raise Exception(f"Stream: {stream_name} already registered")
 
             self._callables[stream_name] = func
-            streem_task = StreemTask(self, stream_name, func)
-            return streem_task
 
+            @wraps(func)
+            async def _call(self, *args, **kwargs):
+                await self._create_redis()
+
+                arguments = pickle.dumps(args)
+                kwarguments = pickle.dumps(kwargs)
+                data = {
+                    "arguments": arguments,
+                    "kwarguments": kwarguments
+                }
+
+                return await self.redis._redis.xadd(self._stream_name, data)
+            return _call
         return _decorator
 
     async def start(self, consumer_name: str, group_name: str = "workers"):
